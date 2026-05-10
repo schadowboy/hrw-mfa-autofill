@@ -1,0 +1,55 @@
+{
+  "manifest_version": 2,
+  "name": "HRW MFA Autofill",
+  "version": "1.6.8",
+  "description": "MFA-Autofill für HS Ruhr West — AES-256 · PIN-Schutz · Firefox",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "hrw-mfa-autofill@private",
+      "strict_min_version": "109.0"
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "tabs",
+    "https://sso.hs-rw.de/*",
+    "https://portal.hs-ruhrwest.de/*",
+    "https://owa.hs-ruhrwest.de/*",
+    "https://campusnet.hs-ruhrwest.de/*",
+    "https://dsf.hs-ruhrwest.de/*"
+  ],
+  "background": {
+    "scripts": ["lib/compat.js", "lib/crypto.js", "background.js"],
+    "persistent": false
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://sso.hs-rw.de/idp/profile/SAML2/Redirect/SSO*",
+        "https://portal.hs-ruhrwest.de/site_publishing_helper/login_check/*",
+        "https://portal.hs-ruhrwest.de/SitePages/*",
+        "https://owa.hs-ruhrwest.de/owa/*",
+        "https://campusnet.hs-ruhrwest.de/*",
+        "https://dsf.hs-ruhrwest.de/IdentityServer/*"
+      ],
+      "js": ["lib/compat.js", "lib/totp.js", "lib/crypto.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_title": "HRW MFA Autofill",
+    "default_icon": {
+      "16":  "icons/icon16.png",
+      "48":  "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": "script-src 'self'; object-src 'self';"
+}

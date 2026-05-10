@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="system">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HRW MFA Autofill</title>
+<style>
+/* ── Theme Variables ─────────────────────────────────────────── */
+:root {
+  --hrw-cyan:       #00B4D8;
+  --hrw-cyan-dark:  #0090B0;
+  --hrw-cyan-pale:  #E6F7FB;
+  --hrw-cyan-mid:   #B3E8F4;
+  --success:        #1A9E6A;
+  --warn:           #E08C00;
+  --danger:         #C0392B;
+  --font-body:      system-ui, -apple-system, sans-serif;
+  --font-mono:      'Roboto Mono', 'Courier New', monospace;
+}
+
+/* Light theme (default) */
+[data-theme="light"], [data-theme="system"] {
+  --bg:          #FFFFFF;
+  --bg-2:        #F8FAFB;
+  --bg-3:        #F0F4F6;
+  --border:      #DEE5E9;
+  --border-2:    #C8D5DC;
+  --text:        #1E3040;
+  --text-2:      #5C7380;
+  --text-3:      #9AADB8;
+  --input-bg:    #F8FAFB;
+  --card-bg:     #F8FAFB;
+  --header-sub:  rgba(255,255,255,0.75);
+  --footer-bg:   #F0F4F6;
+  --switch-off:  #DEE5E9;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --bg:          #141B22;
+  --bg-2:        #1C252E;
+  --bg-3:        #243040;
+  --border:      #2E3F50;
+  --border-2:    #3D5268;
+  --text:        #E8EFF5;
+  --text-2:      #8AABBE;
+  --text-3:      #556B80;
+  --input-bg:    #1C252E;
+  --card-bg:     #1C252E;
+  --header-sub:  rgba(255,255,255,0.6);
+  --footer-bg:   #0F161C;
+  --switch-off:  #2E3F50;
+  --hrw-cyan-pale: rgba(0,180,216,0.1);
+  --hrw-cyan-mid:  rgba(0,180,216,0.25);
+}
+
+/* System: auto-switch via media query */
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --bg:          #141B22;
+    --bg-2:        #1C252E;
+    --bg-3:        #243040;
+    --border:      #2E3F50;
+    --border-2:    #3D5268;
+    --text:        #E8EFF5;
+    --text-2:      #8AABBE;
+    --text-3:      #556B80;
+    --input-bg:    #1C252E;
+    --card-bg:     #1C252E;
+    --header-sub:  rgba(255,255,255,0.6);
+    --footer-bg:   #0F161C;
+    --switch-off:  #2E3F50;
+    --hrw-cyan-pale: rgba(0,180,216,0.1);
+    --hrw-cyan-mid:  rgba(0,180,216,0.25);
+  }
+}
+
+/* ── Reset & Base ────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 360px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden; /* No scrollbars ever */
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.hrw-header { background: var(--hrw-cyan); }
+.hrw-header-inner { display: flex; align-items: stretch; }
+
+.hrw-logo-block {
+  background: var(--hrw-cyan-dark);
+  padding: 12px 14px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.hrw-circle {
+  width: 34px; height: 34px;
+  background: #fff; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.hrw-circle span {
+  font-weight: 800; font-size: 11px;
+  color: var(--hrw-cyan); letter-spacing: -0.5px;
+}
+.hrw-header-text { padding: 11px 14px; display: flex; flex-direction: column; justify-content: center; }
+.hrw-header-title { font-weight: 700; font-size: 17px; color: #fff; letter-spacing: 0.2px; line-height: 1; }
+.hrw-header-sub   { font-size: 10px; font-weight: 500; color: var(--header-sub); letter-spacing: 0.8px; text-transform: uppercase; margin-top: 3px; }
+
+.hrw-status-bar {
+  background: var(--hrw-cyan-dark);
+  padding: 4px 14px;
+  font-size: 10px; font-weight: 500;
+  color: rgba(255,255,255,0.8);
+  letter-spacing: 0.4px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.hrw-status-left { display: flex; align-items: center; gap: 6px; }
+.hrw-status-dot  { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.35); flex-shrink: 0; }
+.hrw-status-dot.active { background: #7EF2B2; }
+
+/* Theme switcher in status bar */
+.theme-switcher { display: flex; gap: 3px; }
+.theme-btn {
+  background: none; border: none;
+  padding: 2px 5px; border-radius: 3px;
+  font-size: 11px; cursor: pointer; color: rgba(255,255,255,0.6);
+  transition: background 0.15s, color 0.15s;
+}
+.theme-btn:hover           { color: #fff; }
+.theme-btn.active          { background: rgba(255,255,255,0.18); color: #fff; }
+
+/* ── PIN Overlay ─────────────────────────────────────────────── */
+.pin-body { padding: 24px 24px 20px; background: var(--bg); }
+.pin-icon {
+  width: 50px; height: 50px;
+  background: var(--hrw-cyan-pale);
+  border: 2px solid var(--hrw-cyan-mid);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 14px;
+}
+.pin-icon svg { width: 22px; height: 22px; color: var(--hrw-cyan-dark); }
+.pin-heading { font-weight: 700; font-size: 19px; color: var(--text); text-align: center; margin-bottom: 5px; }
+.pin-desc    { font-size: 12px; color: var(--text-2); text-align: center; line-height: 1.5; margin-bottom: 18px; }
+
+.pin-input-row input {
+  width: 100%; padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-mono); font-size: 16px;
+  letter-spacing: 4px; text-align: center;
+  color: var(--text); background: var(--input-bg);
+  outline: none; transition: border 0.15s;
+  margin-bottom: 6px;
+}
+.pin-input-row input:focus { border-color: var(--hrw-cyan); background: var(--bg); }
+.pin-error { font-size: 11px; color: var(--danger); text-align: center; min-height: 15px; margin-bottom: 10px; }
+.pin-hint  {
+  font-size: 11px; color: var(--warn); line-height: 1.4; text-align: center;
+  background: rgba(224,140,0,0.08); border: 1px solid rgba(224,140,0,0.3);
+  border-radius: 4px; padding: 6px 10px; margin-bottom: 12px;
+}
+.pin-hint:empty { display: none; }
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn-primary {
+  width: 100%; padding: 10px;
+  background: var(--hrw-cyan); border: none; border-radius: 4px;
+  color: #fff; font-weight: 700; font-size: 14px;
+  cursor: pointer; transition: background 0.15s;
+}
+.btn-primary:hover:not(:disabled) { background: var(--hrw-cyan-dark); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-outline {
+  width: 100%; padding: 9px;
+  background: var(--bg); border: 1.5px solid var(--hrw-cyan);
+  border-radius: 4px; color: var(--hrw-cyan);
+  font-weight: 700; font-size: 13px;
+  cursor: pointer; transition: background 0.15s;
+}
+.btn-outline:hover { background: var(--hrw-cyan-pale); }
+.btn-outline.danger { border-color: var(--danger); color: var(--danger); }
+.btn-outline.danger:hover { background: rgba(192,57,43,0.08); }
+
+/* ── Main UI ─────────────────────────────────────────────────── */
+#mainUI { display: none; }
+
+/* ── Tab Bar ─────────────────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  border-bottom: 2px solid var(--border);
+  background: var(--bg);
+}
+.tab {
+  flex: 1; padding: 9px 6px;
+  text-align: center; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--text-3); cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab.active  { color: var(--hrw-cyan); border-bottom-color: var(--hrw-cyan); }
+.tab:hover:not(.active) { color: var(--text-2); }
+
+/* ── Panels — fixed height per tab ──────────────────────────── */
+.panel { display: none; padding: 14px 16px; overflow: hidden; }
+.panel.active { display: block; }
+
+/* TOTP tab: fixed compact height */
+#tab-totp     { }
+/* Settings tab */
+#tab-settings { }
+/* Security tab: auto-size, no scroll */
+#tab-security { padding: 12px 16px; }
+
+/* ── TOTP Card ───────────────────────────────────────────────── */
+.totp-card {
+  background: var(--card-bg); border: 1.5px solid var(--border);
+  border-radius: 4px; padding: 12px 14px;
+  position: relative; margin-bottom: 12px;
+}
+.totp-label { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text-3); margin-bottom: 5px; }
+.totp-code  { font-family: var(--font-mono); font-size: 28px; font-weight: 500; letter-spacing: 8px; color: var(--hrw-cyan); line-height: 1; }
+.totp-code.warn   { color: var(--warn); }
+.totp-code.danger { color: var(--danger); }
+.totp-code.empty  { color: var(--text-3); font-size: 15px; letter-spacing: 3px; }
+
+.timer-track { height: 3px; background: var(--border); border-radius: 2px; margin-top: 9px; overflow: hidden; }
+.timer-fill  { height: 100%; background: var(--hrw-cyan); border-radius: 2px; transition: width 1s linear, background 0.3s; width: 0%; }
+.timer-label { font-size: 10px; color: var(--text-3); margin-top: 4px; font-family: var(--font-mono); }
+
+.copy-btn {
+  position: absolute; top: 10px; right: 10px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  color: var(--text-2); border-radius: 3px;
+  padding: 3px 9px; font-size: 11px; font-weight: 500;
+  cursor: pointer; display: none; transition: all 0.15s;
+}
+.copy-btn:hover        { border-color: var(--hrw-cyan); color: var(--hrw-cyan); }
+.copy-btn.copied       { border-color: var(--success); color: var(--success); }
+
+/* ── Toggle Group ────────────────────────────────────────────── */
+.section-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--text-3);
+  margin: 12px 0 7px;
+}
+.section-label:first-child { margin-top: 0; }
+
+.toggle-group {
+  background: var(--card-bg); border: 1.5px solid var(--border);
+  border-radius: 4px; overflow: hidden; margin-bottom: 0;
+}
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-row { transition: opacity 0.2s; }
+.toggle-name { font-size: 12px; font-weight: 500; color: var(--text); }
+.toggle-desc { font-size: 10px; color: var(--text-3); margin-top: 1px; }
+.toggle-text { flex: 1; padding-right: 12px; }
+
+.switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch-track {
+  position: absolute; inset: 0; background: var(--switch-off);
+  border-radius: 10px; cursor: pointer; transition: background 0.2s;
+}
+.switch-track::before {
+  content: ''; position: absolute;
+  width: 14px; height: 14px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.switch input:checked + .switch-track { background: var(--hrw-cyan); }
+.switch input:checked + .switch-track::before { transform: translateX(16px); }
+
+/* Session timeout select */
+.timeout-select {
+  background: var(--input-bg); border: 1.5px solid var(--border);
+  border-radius: 4px; padding: 4px 7px;
+  font-size: 12px; font-family: var(--font-body);
+  color: var(--text); cursor: pointer; outline: none;
+}
+.timeout-select:focus { border-color: var(--hrw-cyan); }
+
+/* ── Form Fields ─────────────────────────────────────────────── */
+.field { margin-bottom: 10px; }
+.field-label {
+  display: block; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.3px; text-transform: uppercase;
+  color: var(--text-3); margin-bottom: 4px;
+}
+.field-input-wrap { position: relative; }
+.field input[type="text"],
+.field input[type="password"] {
+  width: 100%; padding: 8px 11px;
+  border: 1.5px solid var(--border); border-radius: 4px;
+  font-family: var(--font-body); font-size: 13px;
+  color: var(--text); background: var(--input-bg);
+  outline: none; transition: border 0.15s, background 0.15s;
+}
+.field input:focus { border-color: var(--hrw-cyan); background: var(--bg); }
+.field-toggle {
+  position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+  background: none; border: none;
+  font-size: 11px; font-weight: 500; color: var(--hrw-cyan);
+  cursor: pointer; padding: 0;
+}
+
+/* Save / action buttons */
+.save-btn {
+  width: 100%; padding: 10px;
+  background: var(--hrw-cyan); border: none; border-radius: 4px;
+  color: #fff; font-weight: 700; font-size: 14px;
+  cursor: pointer; transition: background 0.15s; margin-top: 12px;
+}
+.save-btn:hover:not(:disabled) { background: var(--hrw-cyan-dark); }
+.save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.status-msg { text-align: center; font-size: 11px; font-weight: 500; margin-top: 6px; min-height: 15px; color: var(--success); }
+
+/* Row of two buttons */
+.btn-row { display: flex; gap: 8px; margin-top: 12px; }
+.btn-row .save-btn { margin-top: 0; }
+.btn-lock {
+  flex: 0 0 auto; padding: 10px 13px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  border-radius: 4px; font-size: 14px; cursor: pointer;
+  color: var(--text-2); transition: all 0.15s;
+}
+.btn-lock:hover { border-color: var(--border-2); color: var(--text); }
+
+/* ── Security tab — compact, no scroll ───────────────────────── */
+.info-block {
+  background: var(--hrw-cyan-pale);
+  border: 1.5px solid var(--hrw-cyan-mid);
+  border-radius: 4px; padding: 9px 12px; margin-bottom: 10px;
+}
+.info-block p { font-size: 11px; color: var(--hrw-cyan-dark); line-height: 1.5; }
+[data-theme="dark"] .info-block p { color: #7FD4E8; }
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] .info-block p { color: #7FD4E8; }
+}
+
+.sec-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6px; margin-bottom: 10px;
+}
+.sec-item {
+  background: var(--card-bg); border: 1.5px solid var(--border);
+  border-radius: 4px; padding: 8px 10px;
+  display: flex; align-items: flex-start; gap: 7px;
+}
+.sec-emoji { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.sec-item-text p    { font-size: 11px; font-weight: 500; color: var(--text); line-height: 1.3; }
+.sec-item-text span { font-size: 10px; color: var(--text-3); line-height: 1.3; display: block; margin-top: 1px; }
+
+.sec-actions { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.hrw-footer {
+  background: var(--footer-bg); border-top: 1px solid var(--border);
+  padding: 6px 14px; font-size: 10px; color: var(--text-3);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* ── SVG Icons ───────────────────────────────────────────────── */
+.ico { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ico svg { display: block; }
+.sec-emoji { display: flex; align-items: flex-start; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+.sec-emoji svg { width: 15px; height: 15px; stroke: var(--text-2); fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.theme-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.btn-lock svg  { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.btn-outline svg, .pin-icon-svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────── -->
+<div class="hrw-header">
+  <div class="hrw-header-inner">
+    <div class="hrw-logo-block">
+      <div class="hrw-circle"><span>HRW</span></div>
+    </div>
+    <div class="hrw-header-text">
+      <div class="hrw-header-title">MFA Autofill</div>
+      <div class="hrw-header-sub">Hochschule Ruhr West</div>
+    </div>
+  </div>
+  <div class="hrw-status-bar">
+    <div class="hrw-status-left">
+      <div class="hrw-status-dot" id="statusDot"></div>
+      <span id="statusBarText">Nicht entsperrt</span>
+    </div>
+    <div class="theme-switcher">
+      <button class="theme-btn" data-theme-val="light"  title="Hell"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button>
+      <button class="theme-btn" data-theme-val="dark"   title="Dunkel"><svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+      <button class="theme-btn active" data-theme-val="system" title="System"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PIN Overlay ─────────────────────────────────────────── -->
+<div id="pinOverlay">
+  <div class="pin-body">
+    <div class="pin-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <div class="pin-heading" id="pinHeading">PIN festlegen</div>
+    <div class="pin-desc"    id="pinDesc">Lege einen PIN fest (mind. 4 Zeichen). Er schützt deine Zugangsdaten mit AES-256-GCM.</div>
+    <div class="pin-input-row">
+      <input type="password" id="pinInput" placeholder="PIN eingeben" autocomplete="off" maxlength="64">
+    </div>
+    <div class="pin-error" id="pinError"></div>
+    <div class="pin-hint"  id="pinHint"></div>
+    <button class="btn-primary" id="pinSubmitBtn" data-mode="setup">Festlegen</button>
+  </div>
+</div>
+
+<!-- ── Main UI ─────────────────────────────────────────────── -->
+<div id="mainUI">
+
+  <div class="tab-bar">
+    <div class="tab active" data-tab="totp">TOTP-Code</div>
+    <div class="tab" data-tab="settings">Einstellungen</div>
+    <div class="tab" data-tab="security">Sicherheit</div>
+  </div>
+
+  <!-- TOTP Panel -->
+  <div class="panel active" id="tab-totp">
+    <div class="totp-card">
+      <div class="totp-label">Aktueller MFA-Code</div>
+      <div class="totp-code empty" id="totpDisplay">– – – – – –</div>
+      <button class="copy-btn" id="copyBtn">Kopieren</button>
+      <div class="timer-track"><div class="timer-fill" id="timerFill"></div></div>
+      <div class="timer-label" id="timerText"></div>
+    </div>
+
+    <div class="section-label">Optionen</div>
+    <div class="toggle-group">
+      <div class="toggle-row">
+        <div class="toggle-text">
+          <div class="toggle-name">Autofill aktiv</div>
+          <div class="toggle-desc">Felder automatisch ausfüllen</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="autofill"><span class="switch-track"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-text">
+          <div class="toggle-name">Auto-Submit</div>
+          <div class="toggle-desc">Formular automatisch absenden</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="autologin"><span class="switch-track"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-text">
+          <div class="toggle-name">Session-Timeout</div>
+          <div class="toggle-desc">Automatisch sperren nach</div>
+        </div>
+        <select id="sessionTimeout" class="timeout-select">
+          <option value="30">30 Min.</option>
+          <option value="60" selected>60 Min.</option>
+          <option value="120">2 Std.</option>
+          <option value="480">8 Std.</option>
+          <option value="0">Browser-Session</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="save-btn" id="saveBtnQuick" style="flex:1;margin-top:0">Speichern</button>
+      <button class="btn-lock" id="lockBtn" title="Sperren"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>
+    </div>
+    <div class="status-msg" id="statusMsgQuick"></div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div class="panel" id="tab-settings">
+    <div class="section-label" style="margin-top:0">Zugangsdaten</div>
+    <div class="field">
+      <label class="field-label" for="username">Benutzername</label>
+      <input type="text" id="username" placeholder="s123456" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label class="field-label" for="password">Passwort</label>
+      <div class="field-input-wrap">
+        <input type="password" id="password" placeholder="••••••••" autocomplete="off" style="padding-right:62px">
+        <button class="field-toggle" id="togglePw">anzeigen</button>
+      </div>
+    </div>
+    <div class="section-label">Authenticator</div>
+    <div class="field">
+      <label class="field-label" for="totpSecret">TOTP-Schlüssel (Base32)</label>
+      <div class="field-input-wrap">
+        <input type="password" id="totpSecret" placeholder="JBSWY3DPEHPK3PXP" autocomplete="off" spellcheck="false"
+               style="padding-right:62px;font-family:var(--font-mono);letter-spacing:2px">
+        <button class="field-toggle" id="toggleSecret">anzeigen</button>
+      </div>
+    </div>
+    <button class="save-btn" id="saveBtn">Verschlüsselt speichern</button>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+
+  <!-- Security Panel — compact 2-column grid, no scroll -->
+  <div class="panel" id="tab-security">
+    <div class="info-block">
+      <p><strong>AES-256-GCM</strong> · Credentials PIN-verschlüsselt · kein Plaintext in Storage · Service-Worker-Restart-sicher via <code style="font-size:10px;background:rgba(0,0,0,0.1);padding:1px 4px;border-radius:2px">chrome.storage.session</code></p>
+    </div>
+
+    <div class="sec-grid">
+      <div class="sec-item">
+        <span class="sec-emoji"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        <div class="sec-item-text">
+          <p>AES-256-GCM</p>
+          <span>PBKDF2 · 200k Iter.</span>
+        </div>
+      </div>
+      <div class="sec-item">
+        <span class="sec-emoji"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></span>
+        <div class="sec-item-text">
+          <p>Session Storage</p>
+          <span>Kein Disk-Write</span>
+        </div>
+      </div>
+      <div class="sec-item">
+        <span class="sec-emoji"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg></span>
+        <div class="sec-item-text">
+          <p>TOTP lokal</p>
+          <span>RFC 6238 · WebCrypto</span>
+        </div>
+      </div>
+      <div class="sec-item">
+        <span class="sec-emoji"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+        <div class="sec-item-text">
+          <p>Origin-Check</p>
+          <span>Kein DOM-Hijack</span>
+        </div>
+      </div>
+      <div class="sec-item">
+        <span class="sec-emoji"><svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
+        <div class="sec-item-text">
+          <p>Replay-Schutz</p>
+          <span>TOTP einmalig</span>
+        </div>
+      </div>
+      <div class="sec-item">
+        <span class="sec-emoji"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 14.5 15.5"/><path d="M5 3 2 6"/><path d="M22 6l-3-3"/><line x1="12" y1="5" x2="12" y2="2"/></svg></span>
+        <div class="sec-item-text">
+          <p>Auto-Lock</p>
+          <span id="secTimeoutLabel">60 Min.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-actions">
+      <button class="btn-outline" id="changePinBtn"><svg class="pin-icon-svg" viewBox="0 0 24 24" style="stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg>  PIN ändern</button>
+      <button class="btn-outline danger" id="clearDataBtn"><svg class="pin-icon-svg" viewBox="0 0 24 24" style="stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>  Alle Daten löschen</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Footer ──────────────────────────────────────────────── -->
+<div class="hrw-footer">
+  <span>v1.6 · Privates Addon</span>
+  <span>SSO · Portal · OWA · CampusNet</span>
+</div>
+
+<script src="lib/compat.js"></script>
+<script src="lib/totp.js"></script>
+<script src="lib/crypto.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
